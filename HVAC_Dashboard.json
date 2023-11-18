@@ -1,0 +1,1138 @@
+{
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": 1,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "pointSize": {
+              "fixed": 1
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "show": "points"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/Temperature/"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Outside Temperature"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/Percent/"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/_time/"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Date"
+              },
+              {
+                "id": "unit",
+                "value": "time:MM/DD/YYYY"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "dims": {
+          "exclude": [],
+          "frame": 1
+        },
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "series": [
+          {
+            "name": "Cooling",
+            "pointColor": {
+              "fixed": "blue"
+            },
+            "pointSize": {
+              "fixed": 5,
+              "max": 100,
+              "min": 1
+            },
+            "x": "Outside Temperature (Cooling)",
+            "y": "Percent Elapsed (Cooling)"
+          },
+          {
+            "name": "Heating",
+            "pointColor": {
+              "fixed": "light-red"
+            },
+            "pointSize": {
+              "fixed": 5,
+              "max": 100,
+              "min": 1
+            },
+            "x": "Outside Temperature (Heating)",
+            "y": "Percent Elapsed (Heating)"
+          }
+        ],
+        "seriesMapping": "manual",
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+
+          },
+          "query": "import \"contrib/tomhollingworth/events\"\r\nimport \"math\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nhvac_state_day_ends = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: \"_value\")\r\n\r\nhvac_states = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n\r\nhvac_states_daily = union(tables: [hvac_state_day_ends, hvac_states])\r\n  |> group()\r\n  |> sort(columns: [\"_time\"])\r\n  |> events.duration(unit: 1s, columnName: \"elapsed\")\r\n  |> group(columns: [\"_value\"], mode:\"by\")\r\n  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: \"elapsed\")\r\n  |> fill(column: \"elapsed\", value: 0)\r\n  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))\r\n  |> filter(fn: (r) => r[\"_value\"] != \"idle\")\r\n  |> filter(fn: (r) => r[\"elapsed_pct\"] != 0)\r\n  |> rename(columns: {_value: \"state\"})\r\n  |> keep(columns: [\"_time\", \"elapsed_pct\", \"state\"])\r\n\r\n//yield(tables: hvac_states_daily, name: \"hvac_states_daily\")\r\n\r\noutside_temps = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"friendly_name\"])\r\n  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)\r\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"friendly_name\"], valueColumn: \"_value\")\r\n\r\njoin(tables: {hvac_states_daily, outside_temps}, on: [\"_time\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "HVAC State Runtime vs Avg Outside Temperature",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(Outside Temp.*cooling.*)",
+            "renamePattern": "Outside Temperature (Cooling)"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(elapsed_pct.*cooling.*)",
+            "renamePattern": "Percent Elapsed (Cooling)"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(Outside Temp.*heating.*)",
+            "renamePattern": "Outside Temperature (Heating)"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(elapsed_pct.*heating.*)",
+            "renamePattern": "Percent Elapsed (Heating)"
+          }
+        }
+      ],
+      "transparent": true,
+      "type": "xychart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "fahrenheit"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*Cooling.*/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*Heating.*/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*Temp.*/"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 8,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.75,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Outside Temperature",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 100
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+
+          },
+          "query": "import \"contrib/tomhollingworth/events\"\r\nimport \"math\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nhvac_state_day_ends = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: \"_value\")\r\n\r\nhvac_states = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n\r\nhvac_states_daily = union(tables: [hvac_state_day_ends, hvac_states])\r\n  |> group()\r\n  |> sort(columns: [\"_time\"])\r\n  |> events.duration(unit: 1s, columnName: \"elapsed\")\r\n  |> group(columns: [\"_value\"], mode:\"by\")\r\n  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: \"elapsed\")\r\n  |> fill(column: \"elapsed\", value: 0)\r\n  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))\r\n  |> filter(fn: (r) => r[\"_value\"] != \"idle\")\r\n  |> rename(columns: {_value: \"state\"})\r\n  |> keep(columns: [\"_time\", \"elapsed_pct\", \"state\"])\r\n\r\noutside_temps = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"friendly_name\"])\r\n  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)\r\n  |> map(fn: (r) => ({r with _value: math.round(x: r._value)}))\r\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"friendly_name\"], valueColumn: \"_value\")\r\n\r\n//yield(tables: outside_temps, name: \"outside_temps\")\r\n\r\njoin(tables: {hvac_states_daily, outside_temps}, on: [\"_time\"])\r\n  |> drop(columns: [\"_time\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg HVAC Runtime Per Avg Outside Temperature",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(Outside Temp.*)",
+            "renamePattern": "Outside Temperature"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(elapsed_pct.*cooling.*)",
+            "renamePattern": "Percent Elapsed (Cooling)"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(elapsed_pct.*heating.*)",
+            "renamePattern": "Percent Elapsed (Heating)"
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "Outside Temperature": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "Outside Temperature (Cooling)": {
+                "aggregations": []
+              },
+              "Outside Temperature (Heating)": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "Percent Elapsed (Cooling)": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              },
+              "Percent Elapsed (Heating)": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        },
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Outside Temperature",
+            "mode": "outer"
+          }
+        },
+        {
+          "disabled": true,
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Outside Temperature"
+              }
+            ]
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.*) \\(mean\\)",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Outside Temperature": 2,
+              "Percent Elapsed (Cooling)": 0,
+              "Percent Elapsed (Heating)": 1
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "transparent": true,
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 55,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/cooling/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/heating/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "_time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:MM/DD/YYYY"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 3,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.95,
+        "fullHighlight": false,
+        "groupWidth": 0.6,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "_time",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 100
+      },
+      "pluginVersion": "9.5.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+
+          },
+          "query": "import \"contrib/tomhollingworth/events\"\r\nimport \"math\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nhvac_state_day_ends = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: \"_value\")\r\n\r\nhvac_states = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n\r\nunion(tables: [hvac_state_day_ends, hvac_states])\r\n  |> group()\r\n  |> sort(columns: [\"_time\"])\r\n  |> events.duration(unit: 1s, columnName: \"elapsed\")\r\n  |> group(columns: [\"_value\"], mode:\"by\")\r\n  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: \"elapsed\")\r\n  |> fill(column: \"elapsed\", value: 0)\r\n  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))\r\n  |> filter(fn: (r) => r[\"_value\"] != \"idle\")\r\n  |> drop(columns: [\"elapsed\"])\r\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Percent HVAC State Per Day",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*heating.*",
+            "renamePattern": "heating"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*cooling.*",
+            "renamePattern": "cooling"
+          }
+        },
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "wide"
+          }
+        }
+      ],
+      "transparent": true,
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd",
+            "seriesBy": "last"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 22,
+            "gradientMode": "scheme",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 3,
+            "pointSize": 6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "fahrenheit"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "continuous-GrYlRd"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "High"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "min"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "continuous-BlYlRd"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Low"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Average"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:MM/DD/YYYY"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+
+          },
+          "query": "import \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\ntemps = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"friendly_name\", \"_value\"])\r\n\r\nmax_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: max, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"max\" }))\r\n  |> yield(name: \"max\")\r\n\r\navg_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"avg\" }))\r\n  |> yield(name: \"avg\")\r\n\r\nmin_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: min, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"min\" }))\r\n  |> yield(name: \"min\")",
+          "refId": "A"
+        }
+      ],
+      "title": "Daily Outside Temperatures",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "fahrenheit"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Attic Temperature"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Outside Temperature"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Basement Temperature"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bedroom Temperature"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Kitchen Temperature"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+
+          },
+          "query": "import \"interpolate\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nfrom(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Attic Temperature\" or r[\"friendly_name\"] == \"Basement Temperature\" or r[\"friendly_name\"] == \"Bedroom Temperature\" or r[\"friendly_name\"] == \"Kitchen Temperature\" or r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> interpolate.linear(every: 1h)\r\n  |> keep(columns: [\"_time\", \"friendly_name\", \"_value\"])\r\n  |> aggregateWindow(every: v.windowPeriod, fn: first, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Temperatures",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "dark-yellow",
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "decimals": 0,
+          "mappings": [
+            {
+              "options": {
+                "cooling": {
+                  "color": "blue",
+                  "index": 1
+                },
+                "heating": {
+                  "color": "red",
+                  "index": 2
+                },
+                "idle": {
+                  "color": "#6666664d",
+                  "index": 0
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "string"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "id": 2,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "9.5.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+
+          },
+          "query": "from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "HVAC State",
+      "transparent": true,
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "fahrenheit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+
+          },
+          "query": "import \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nbedroom_temp = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Bedroom Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\r\n  |> fill(usePrevious: true)\r\n  |> filter(fn: (r) => exists r._value)\r\n\r\nkitchen_temp = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Kitchen Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\r\n  |> fill(usePrevious: true)\r\n  |> filter(fn: (r) => exists r._value)\r\n\r\njoin(tables: {bedroom_temp, kitchen_temp}, on: [\"_time\"])\r\n  |> map(fn: (r) => ({r with diff: float(v: r._value_bedroom_temp - r._value_kitchen_temp)}))\r\n  |> keep(columns: [\"_time\", \"diff\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Temperature Difference Between Floors",
+      "transparent": true,
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1d",
+  "schemaVersion": 38,
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6M",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "HVAC",
+  "version": 22,
+  "weekStart": ""
+}
