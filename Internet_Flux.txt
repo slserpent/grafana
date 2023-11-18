@@ -1,0 +1,33 @@
+import "timezone"
+
+option location = timezone.location(name: "America/New_York")
+
+from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "Data Down Monthly GB" or r["friendly_name"] == "Data Up Monthly GB")
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> filter(fn: (r) => r["_measurement"] == "GB")
+  |> keep(columns: ["_time", "_value", "friendly_name"])
+  |> aggregateWindow(every: 1mo, fn: max, createEmpty: false)
+
+
+
+---
+
+
+
+//this data is from an Home Assistant Utility Meter that continuously counts up until the 
+// end of the month
+
+import "timezone"
+
+option location = timezone.location(name: "America/New_York")
+
+from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "Data Down Monthly GB" or r["friendly_name"] == "Data Up Monthly GB")
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> filter(fn: (r) => r["_measurement"] == "GB")
+  |> keep(columns: ["_time", "_value", "friendly_name"])
+  |> aggregateWindow(every: 1d, fn: max, createEmpty: false)
+  |> difference(nonNegative: true, initialZero: true)

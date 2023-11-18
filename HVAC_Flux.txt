@@ -1,0 +1,210 @@
+import "contrib/tomhollingworth/events"
+import "math"
+import "timezone"
+
+option location = timezone.location(name: "America/New_York")
+
+hvac_state_day_ends = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "HVAC State")
+  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: "_value")
+
+hvac_states = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "HVAC State")
+
+hvac_states_daily = union(tables: [hvac_state_day_ends, hvac_states])
+  |> group()
+  |> sort(columns: ["_time"])
+  |> events.duration(unit: 1s, columnName: "elapsed")
+  |> group(columns: ["_value"], mode:"by")
+  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: "elapsed")
+  |> fill(column: "elapsed", value: 0)
+  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))
+  |> filter(fn: (r) => r["_value"] != "idle")
+  |> filter(fn: (r) => r["elapsed_pct"] != 0)
+  |> rename(columns: {_value: "state"})
+  |> keep(columns: ["_time", "elapsed_pct", "state"])
+
+//yield(tables: hvac_states_daily, name: "hvac_states_daily")
+
+outside_temps = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "Outside Temperature")
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> keep(columns: ["_time", "_value", "friendly_name"])
+  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)
+  |> pivot(rowKey: ["_time"], columnKey: ["friendly_name"], valueColumn: "_value")
+
+join(tables: {hvac_states_daily, outside_temps}, on: ["_time"])
+
+
+
+---
+
+
+
+import "contrib/tomhollingworth/events"
+import "math"
+import "timezone"
+
+option location = timezone.location(name: "America/New_York")
+
+hvac_state_day_ends = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "HVAC State")
+  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: "_value")
+
+hvac_states = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "HVAC State")
+
+hvac_states_daily = union(tables: [hvac_state_day_ends, hvac_states])
+  |> group()
+  |> sort(columns: ["_time"])
+  |> events.duration(unit: 1s, columnName: "elapsed")
+  |> group(columns: ["_value"], mode:"by")
+  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: "elapsed")
+  |> fill(column: "elapsed", value: 0)
+  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))
+  |> filter(fn: (r) => r["_value"] != "idle")
+  |> rename(columns: {_value: "state"})
+  |> keep(columns: ["_time", "elapsed_pct", "state"])
+
+outside_temps = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "Outside Temperature")
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> keep(columns: ["_time", "_value", "friendly_name"])
+  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)
+  |> map(fn: (r) => ({r with _value: math.round(x: r._value)}))
+  |> pivot(rowKey: ["_time"], columnKey: ["friendly_name"], valueColumn: "_value")
+
+//yield(tables: outside_temps, name: "outside_temps")
+
+join(tables: {hvac_states_daily, outside_temps}, on: ["_time"])
+  |> drop(columns: ["_time"])
+
+
+
+---
+
+
+
+import "contrib/tomhollingworth/events"
+import "math"
+import "timezone"
+
+option location = timezone.location(name: "America/New_York")
+
+hvac_state_day_ends = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "HVAC State")
+  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: "_value")
+
+hvac_states = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "HVAC State")
+
+union(tables: [hvac_state_day_ends, hvac_states])
+  |> group()
+  |> sort(columns: ["_time"])
+  |> events.duration(unit: 1s, columnName: "elapsed")
+  |> group(columns: ["_value"], mode:"by")
+  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: "elapsed")
+  |> fill(column: "elapsed", value: 0)
+  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))
+  |> filter(fn: (r) => r["_value"] != "idle")
+  |> drop(columns: ["elapsed"])
+
+
+
+
+---
+
+
+
+import "timezone"
+
+option location = timezone.location(name: "America/New_York")
+
+temps = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "Outside Temperature")
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> keep(columns: ["_time", "friendly_name", "_value"])
+
+max_temp = temps
+  |> aggregateWindow(every: 24h, fn: max, createEmpty: false)
+  |> map(fn: (r) => ({ r with friendly_name: "max" }))
+  |> yield(name: "max")
+
+avg_temp = temps
+  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)
+  |> map(fn: (r) => ({ r with friendly_name: "avg" }))
+  |> yield(name: "avg")
+
+min_temp = temps
+  |> aggregateWindow(every: 24h, fn: min, createEmpty: false)
+  |> map(fn: (r) => ({ r with friendly_name: "min" }))
+  |> yield(name: "min")
+
+
+
+---
+
+
+
+import "interpolate"
+import "timezone"
+
+option location = timezone.location(name: "America/New_York")
+
+from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "Attic Temperature" or r["friendly_name"] == "Basement Temperature" or r["friendly_name"] == "Bedroom Temperature" or r["friendly_name"] == "Kitchen Temperature" or r["friendly_name"] == "Outside Temperature")
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> interpolate.linear(every: 1h)
+  |> keep(columns: ["_time", "friendly_name", "_value"])
+  |> aggregateWindow(every: v.windowPeriod, fn: first, createEmpty: false)
+
+
+
+---
+
+
+
+from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "HVAC State")
+  |> keep(columns: ["_time", "_value"])
+
+
+
+---
+
+
+
+import "timezone"
+
+option location = timezone.location(name: "America/New_York")
+
+bedroom_temp = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "Bedroom Temperature")
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)
+  |> fill(usePrevious: true)
+  |> filter(fn: (r) => exists r._value)
+
+kitchen_temp = from(bucket: "home-assistant")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["friendly_name"] == "Kitchen Temperature")
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)
+  |> fill(usePrevious: true)
+  |> filter(fn: (r) => exists r._value)
+
+join(tables: {bedroom_temp, kitchen_temp}, on: ["_time"])
+  |> map(fn: (r) => ({r with diff: float(v: r._value_bedroom_temp - r._value_kitchen_temp)}))
+  |> keep(columns: ["_time", "diff"])
