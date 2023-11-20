@@ -7,6 +7,27 @@
       "type": "datasource",
       "pluginId": "influxdb",
       "pluginName": "InfluxDB"
+    },
+    {
+      "name": "VAR_HA_BUCKET",
+      "type": "constant",
+      "label": "HA_Bucket",
+      "value": "home-assistant",
+      "description": ""
+    },
+    {
+      "name": "VAR_DATA_DOWN",
+      "type": "constant",
+      "label": "The friendly name for your entity holding a utility meter value for downstream data in numeric format.",
+      "value": "Data Down Monthly GB",
+      "description": ""
+    },
+    {
+      "name": "VAR_DATA_UP",
+      "type": "constant",
+      "label": "The friendly name for your entity holding a utility meter value for upstream data in numeric format.",
+      "value": "Data Up Monthly GB",
+      "description": ""
     }
   ],
   "__elements": {},
@@ -81,7 +102,7 @@
               "type": "linear"
             },
             "thresholdsStyle": {
-              "mode": "off"
+              "mode": "line"
             }
           },
           "mappings": [],
@@ -94,7 +115,7 @@
               },
               {
                 "color": "red",
-                "value": 80
+                "value": 1250
               }
             ]
           },
@@ -140,6 +161,10 @@
               {
                 "id": "unit",
                 "value": "time: MM-YYYY"
+              },
+              {
+                "id": "displayName",
+                "value": "Month"
               }
             ]
           }
@@ -158,18 +183,22 @@
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "mean",
+            "sum"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
         "orientation": "auto",
         "showValue": "auto",
-        "stacking": "none",
+        "stacking": "normal",
         "tooltip": {
           "mode": "multi",
           "sort": "none"
         },
+        "xField": "Time",
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -179,7 +208,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "import \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nfrom(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Data Down Monthly GB\" or r[\"friendly_name\"] == \"Data Up Monthly GB\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"GB\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"friendly_name\"])\r\n  |> aggregateWindow(every: 1mo, fn: max, createEmpty: false)",
+          "query": "import \"timezone\"\r\nimport \"date\"\r\n\r\noption location = timezone.location(name: \"$__timezone\")\r\n\r\nfrom(bucket: \"${HA_Bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${Data_Down}\" or r[\"friendly_name\"] == \"${Data_Up}\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"friendly_name\"])\r\n  |> aggregateWindow(every: 1mo, fn: max, createEmpty: false)\r\n  |> map(fn: (r) => ({r with _time: date.sub(d: 1s, from: r._time) }))",
           "refId": "A"
         }
       ],
@@ -283,6 +312,10 @@
               {
                 "id": "unit",
                 "value": "time:MM-DD-YYYY"
+              },
+              {
+                "id": "displayName",
+                "value": "Day"
               }
             ]
           }
@@ -308,7 +341,7 @@
         },
         "orientation": "auto",
         "showValue": "auto",
-        "stacking": "none",
+        "stacking": "normal",
         "tooltip": {
           "mode": "multi",
           "sort": "none"
@@ -323,7 +356,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "//this data is from an Home Assistant Utility Meter that continuously counts up until the \r\n// end of the month\r\n\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nfrom(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Data Down Monthly GB\" or r[\"friendly_name\"] == \"Data Up Monthly GB\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"GB\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"friendly_name\"])\r\n  |> aggregateWindow(every: 1d, fn: max, createEmpty: false)\r\n  |> difference(nonNegative: true, initialZero: true)",
+          "query": "//this data is from an Home Assistant Utility Meter that continuously counts up until the \r\n// end of the month\r\n\r\nimport \"timezone\"\r\nimport \"date\"\r\n\r\noption location = timezone.location(name: \"$__timezone\")\r\n\r\nfrom(bucket: \"${HA_Bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${Data_Down}\" or r[\"friendly_name\"] == \"${Data_Up}\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"friendly_name\"])\r\n  |> aggregateWindow(every: 1d, fn: max, createEmpty: false)\r\n  |> difference(nonNegative: true, initialZero: true)\r\n  |> map(fn: (r) => ({r with _time: date.sub(d: 1s, from: r._time) }))",
           "refId": "A"
         }
       ],
@@ -348,7 +381,7 @@
     "list": [
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "InfluxDB",
           "value": "f9459216-b5d9-4cfe-9932-8aeb2a14cd88"
         },
@@ -364,17 +397,78 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "hide": 2,
+        "name": "HA_Bucket",
+        "query": "${VAR_HA_BUCKET}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_HA_BUCKET}",
+          "text": "${VAR_HA_BUCKET}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_HA_BUCKET}",
+            "text": "${VAR_HA_BUCKET}",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "description": "",
+        "hide": 2,
+        "label": "The friendly name for your entity holding a utility meter value for downstream data in numeric format.",
+        "name": "Data_Down",
+        "query": "${VAR_DATA_DOWN}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_DATA_DOWN}",
+          "text": "${VAR_DATA_DOWN}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_DATA_DOWN}",
+            "text": "${VAR_DATA_DOWN}",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "description": "",
+        "hide": 2,
+        "label": "The friendly name for your entity holding a utility meter value for upstream data in numeric format.",
+        "name": "Data_Up",
+        "query": "${VAR_DATA_UP}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_DATA_UP}",
+          "text": "${VAR_DATA_UP}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_DATA_UP}",
+            "text": "${VAR_DATA_UP}",
+            "selected": false
+          }
+        ]
       }
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-6M",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Internet",
   "uid": "b32b278b-5a9e-4914-8e6a-10d1f5243915",
-  "version": 8,
+  "version": 13,
   "weekStart": ""
 }

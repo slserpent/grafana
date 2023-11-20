@@ -7,6 +7,55 @@
       "type": "datasource",
       "pluginId": "influxdb",
       "pluginName": "InfluxDB"
+    },
+    {
+      "name": "VAR_HVAC_STATE",
+      "type": "constant",
+      "label": "The friendly name for your entity holding HVAC state data in string format.",
+      "value": "HVAC State",
+      "description": ""
+    },
+    {
+      "name": "VAR_OUTSIDE_TEMP",
+      "type": "constant",
+      "label": "The friendly name for your entity holding outside temperature data in numeric format.",
+      "value": "Outside Temperature",
+      "description": ""
+    },
+    {
+      "name": "VAR_HA_BUCKET",
+      "type": "constant",
+      "label": "The name of the bucket in InfluxDB holding your Home Assistant data.",
+      "value": "home-assistant",
+      "description": ""
+    },
+    {
+      "name": "VAR_TEMP_SENSOR_1",
+      "type": "constant",
+      "label": "The friendly name for an entity holding temperature data in numeric format.",
+      "value": "Bedroom Temperature",
+      "description": ""
+    },
+    {
+      "name": "VAR_TEMP_SENSOR_2",
+      "type": "constant",
+      "label": "The friendly name for an entity holding temperature data in numeric format.",
+      "value": "Kitchen Temperature",
+      "description": ""
+    },
+    {
+      "name": "VAR_TEMP_SENSOR_3",
+      "type": "constant",
+      "label": "The friendly name for an entity holding temperature data in numeric format.",
+      "value": "Attic Temperature",
+      "description": ""
+    },
+    {
+      "name": "VAR_TEMP_SENSOR_4",
+      "type": "constant",
+      "label": "The friendly name for an entity holding temperature data in numeric format.",
+      "value": "Basement Temperature",
+      "description": ""
     }
   ],
   "__elements": {},
@@ -127,18 +176,10 @@
               {
                 "id": "custom.axisLabel",
                 "value": "Outside Temperature"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "/Percent/"
-            },
-            "properties": [
+              },
               {
-                "id": "custom.axisLabel",
-                "value": "Percent"
+                "id": "unit",
+                "value": "fahrenheit"
               }
             ]
           },
@@ -157,6 +198,38 @@
                 "value": "time:MM/DD/YYYY"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Heating"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cooling"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Percent"
+              }
+            ]
           }
         ]
       },
@@ -166,11 +239,12 @@
         "x": 0,
         "y": 0
       },
-      "id": 4,
+      "id": 9,
       "options": {
         "dims": {
           "exclude": [],
-          "frame": 1
+          "frame": 0,
+          "x": "Outside Temperature (Cooling)"
         },
         "legend": {
           "calcs": [],
@@ -190,7 +264,7 @@
               "min": 1
             },
             "x": "Outside Temperature (Cooling)",
-            "y": "Percent Elapsed (Cooling)"
+            "y": "Cooling"
           },
           {
             "name": "Heating",
@@ -203,7 +277,7 @@
               "min": 1
             },
             "x": "Outside Temperature (Heating)",
-            "y": "Percent Elapsed (Heating)"
+            "y": "Heating"
           }
         ],
         "seriesMapping": "manual",
@@ -235,7 +309,7 @@
           "id": "renameByRegex",
           "options": {
             "regex": "(elapsed_pct.*cooling.*)",
-            "renamePattern": "Percent Elapsed (Cooling)"
+            "renamePattern": "Cooling"
           }
         },
         {
@@ -249,7 +323,7 @@
           "id": "renameByRegex",
           "options": {
             "regex": "(elapsed_pct.*heating.*)",
-            "renamePattern": "Percent Elapsed (Heating)"
+            "renamePattern": "Heating"
           }
         }
       ],
@@ -271,7 +345,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "",
+            "axisLabel": "Outside Temperature",
             "axisPlacement": "auto",
             "fillOpacity": 80,
             "gradientMode": "none",
@@ -323,12 +397,8 @@
                 "value": "percent"
               },
               {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                }
+                "id": "custom.axisLabel",
+                "value": "Percent"
               }
             ]
           },
@@ -348,6 +418,10 @@
               {
                 "id": "unit",
                 "value": "percent"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Percent"
               }
             ]
           },
@@ -404,7 +478,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "import \"contrib/tomhollingworth/events\"\r\nimport \"math\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nhvac_state_day_ends = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: \"_value\")\r\n\r\nhvac_states = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n\r\nhvac_states_daily = union(tables: [hvac_state_day_ends, hvac_states])\r\n  |> group()\r\n  |> sort(columns: [\"_time\"])\r\n  |> events.duration(unit: 1s, columnName: \"elapsed\")\r\n  |> group(columns: [\"_value\"], mode:\"by\")\r\n  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: \"elapsed\")\r\n  |> fill(column: \"elapsed\", value: 0)\r\n  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))\r\n  |> filter(fn: (r) => r[\"_value\"] != \"idle\")\r\n  |> rename(columns: {_value: \"state\"})\r\n  |> keep(columns: [\"_time\", \"elapsed_pct\", \"state\"])\r\n\r\noutside_temps = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"friendly_name\"])\r\n  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)\r\n  |> map(fn: (r) => ({r with _value: math.round(x: r._value)}))\r\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"friendly_name\"], valueColumn: \"_value\")\r\n\r\n//yield(tables: outside_temps, name: \"outside_temps\")\r\n\r\njoin(tables: {hvac_states_daily, outside_temps}, on: [\"_time\"])\r\n  |> drop(columns: [\"_time\"])",
+          "query": "import \"contrib/tomhollingworth/events\"\r\nimport \"math\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"$__timezone\")\r\n\r\nhvac_state_day_ends = from(bucket: \"${HA_Bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${HVAC_State}\")\r\n  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: \"_value\")\r\n\r\nhvac_states = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${HVAC_State}\")\r\n\r\nhvac_states_daily = union(tables: [hvac_state_day_ends, hvac_states])\r\n  |> group()\r\n  |> sort(columns: [\"_time\"])\r\n  |> events.duration(unit: 1s, columnName: \"elapsed\")\r\n  |> group(columns: [\"_value\"], mode:\"by\")\r\n  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: \"elapsed\")\r\n  |> fill(column: \"elapsed\", value: 0)\r\n  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))\r\n  |> filter(fn: (r) => r[\"_value\"] != \"idle\")\r\n  |> rename(columns: {_value: \"state\"})\r\n  |> keep(columns: [\"_time\", \"elapsed_pct\", \"state\"])\r\n\r\noutside_temps = from(bucket: \"${HA_Bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${Outside_Temp}\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"friendly_name\"])\r\n  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)\r\n  |> map(fn: (r) => ({r with _value: math.round(x: r._value)}))\r\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"friendly_name\"], valueColumn: \"_value\")\r\n\r\n//yield(tables: outside_temps, name: \"outside_temps\")\r\n\r\njoin(tables: {hvac_states_daily, outside_temps}, on: [\"_time\"])\r\n  |> drop(columns: [\"_time\"])",
           "refId": "A"
         }
       ],
@@ -421,20 +495,32 @@
           "id": "renameByRegex",
           "options": {
             "regex": "(elapsed_pct.*cooling.*)",
-            "renamePattern": "Percent Elapsed (Cooling)"
+            "renamePattern": "Cooling"
           }
         },
         {
           "id": "renameByRegex",
           "options": {
             "regex": "(elapsed_pct.*heating.*)",
-            "renamePattern": "Percent Elapsed (Heating)"
+            "renamePattern": "Heating"
           }
         },
         {
           "id": "groupBy",
           "options": {
             "fields": {
+              "Cooling": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              },
+              "Heating": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              },
               "Outside Temperature": {
                 "aggregations": [],
                 "operation": "groupby"
@@ -492,9 +578,9 @@
           "options": {
             "excludeByName": {},
             "indexByName": {
-              "Outside Temperature": 2,
-              "Percent Elapsed (Cooling)": 0,
-              "Percent Elapsed (Heating)": 1
+              "Cooling": 0,
+              "Heating": 1,
+              "Outside Temperature": 2
             },
             "renameByName": {}
           }
@@ -631,7 +717,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "import \"contrib/tomhollingworth/events\"\r\nimport \"math\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nhvac_state_day_ends = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: \"_value\")\r\n\r\nhvac_states = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n\r\nunion(tables: [hvac_state_day_ends, hvac_states])\r\n  |> group()\r\n  |> sort(columns: [\"_time\"])\r\n  |> events.duration(unit: 1s, columnName: \"elapsed\")\r\n  |> group(columns: [\"_value\"], mode:\"by\")\r\n  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: \"elapsed\")\r\n  |> fill(column: \"elapsed\", value: 0)\r\n  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))\r\n  |> filter(fn: (r) => r[\"_value\"] != \"idle\")\r\n  |> drop(columns: [\"elapsed\"])\r\n",
+          "query": "import \"contrib/tomhollingworth/events\"\r\nimport \"math\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"$__timezone\")\r\n\r\nhvac_state_day_ends = from(bucket: \"${HA_Bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${HVAC_State}\")\r\n  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: \"_value\")\r\n\r\nhvac_states = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${HVAC_State}\")\r\n\r\nunion(tables: [hvac_state_day_ends, hvac_states])\r\n  |> group()\r\n  |> sort(columns: [\"_time\"])\r\n  |> events.duration(unit: 1s, columnName: \"elapsed\")\r\n  |> group(columns: [\"_value\"], mode:\"by\")\r\n  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: \"elapsed\")\r\n  |> fill(column: \"elapsed\", value: 0)\r\n  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))\r\n  |> filter(fn: (r) => r[\"_value\"] != \"idle\")\r\n  |> drop(columns: [\"elapsed\"])\r\n",
           "refId": "A"
         }
       ],
@@ -820,7 +906,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "import \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\ntemps = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"friendly_name\", \"_value\"])\r\n\r\nmax_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: max, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"max\" }))\r\n  |> yield(name: \"max\")\r\n\r\navg_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"avg\" }))\r\n  |> yield(name: \"avg\")\r\n\r\nmin_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: min, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"min\" }))\r\n  |> yield(name: \"min\")",
+          "query": "import \"timezone\"\r\n\r\noption location = timezone.location(name: \"$__timezone\")\r\n\r\ntemps = from(bucket: \"${HA_Bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${Outside_Temp}\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"friendly_name\", \"_value\"])\r\n\r\nmax_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: max, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"max\" }))\r\n  |> yield(name: \"max\")\r\n\r\navg_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"avg\" }))\r\n  |> yield(name: \"avg\")\r\n\r\nmin_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: min, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"min\" }))\r\n  |> yield(name: \"min\")",
           "refId": "A"
         }
       ],
@@ -989,7 +1075,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "import \"interpolate\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nfrom(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Attic Temperature\" or r[\"friendly_name\"] == \"Basement Temperature\" or r[\"friendly_name\"] == \"Bedroom Temperature\" or r[\"friendly_name\"] == \"Kitchen Temperature\" or r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n//  |> interpolate.linear(every: 1h)\r\n  |> keep(columns: [\"_time\", \"friendly_name\", \"_value\"])\r\n  |> aggregateWindow(every: v.windowPeriod, fn: first, createEmpty: false)",
+          "query": "import \"timezone\"\r\n\r\noption location = timezone.location(name: \"$__timezone\")\r\n\r\nfrom(bucket: \"${HA_Bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${Temp_Sensor_3}\" or r[\"friendly_name\"] == \"${Temp_Sensor_4}\" or r[\"friendly_name\"] == \"${Temp_Sensor_1}\" or r[\"friendly_name\"] == \"${Temp_Sensor_2}\" or r[\"friendly_name\"] == \"${Outside_Temp}\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"friendly_name\", \"_value\"])\r\n  |> aggregateWindow(every: v.windowPeriod, fn: first, createEmpty: false)",
           "refId": "A"
         }
       ],
@@ -1020,20 +1106,24 @@
             "spanNulls": false
           },
           "decimals": 0,
+          "displayName": "State",
           "mappings": [
             {
               "options": {
                 "cooling": {
                   "color": "blue",
-                  "index": 1
+                  "index": 1,
+                  "text": "Cooling"
                 },
                 "heating": {
                   "color": "red",
-                  "index": 2
+                  "index": 2,
+                  "text": "Heating"
                 },
                 "idle": {
                   "color": "#6666664d",
-                  "index": 0
+                  "index": 0,
+                  "text": "Idle"
                 }
               },
               "type": "value"
@@ -1085,7 +1175,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> keep(columns: [\"_time\", \"_value\"])",
+          "query": "from(bucket: \"${HA_Bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${HVAC_State}\")\r\n  |> keep(columns: [\"_time\", \"_value\"])",
           "refId": "A"
         }
       ],
@@ -1179,7 +1269,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "import \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nbedroom_temp = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Bedroom Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\r\n  |> fill(usePrevious: true)\r\n  |> filter(fn: (r) => exists r._value)\r\n\r\nkitchen_temp = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Kitchen Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\r\n  |> fill(usePrevious: true)\r\n  |> filter(fn: (r) => exists r._value)\r\n\r\njoin(tables: {bedroom_temp, kitchen_temp}, on: [\"_time\"])\r\n  |> map(fn: (r) => ({r with diff: float(v: r._value_bedroom_temp - r._value_kitchen_temp)}))\r\n  |> keep(columns: [\"_time\", \"diff\"])",
+          "query": "import \"timezone\"\r\n\r\noption location = timezone.location(name: \"$__timezone\")\r\n\r\nbedroom_temp = from(bucket: \"${HA_Bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${Temp_Sensor_1}\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\r\n  |> fill(usePrevious: true)\r\n  |> filter(fn: (r) => exists r._value)\r\n\r\nkitchen_temp = from(bucket: \"${HA_Bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"${Temp_Sensor_2}\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\r\n  |> fill(usePrevious: true)\r\n  |> filter(fn: (r) => exists r._value)\r\n\r\njoin(tables: {bedroom_temp, kitchen_temp}, on: [\"_time\"])\r\n  |> map(fn: (r) => ({r with diff: float(v: r._value_bedroom_temp - r._value_kitchen_temp)}))\r\n  |> keep(columns: [\"_time\", \"diff\"])",
           "refId": "A"
         }
       ],
@@ -1201,6 +1291,7 @@
         },
         "hide": 2,
         "includeAll": false,
+        "label": "InfluxDB with data from Home Assistant",
         "multi": false,
         "name": "HA_InfluxDB",
         "options": [],
@@ -1209,17 +1300,164 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "description": "",
+        "hide": 2,
+        "label": "The friendly name for your entity holding HVAC state data in string format.",
+        "name": "HVAC_State",
+        "query": "${VAR_HVAC_STATE}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_HVAC_STATE}",
+          "text": "${VAR_HVAC_STATE}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_HVAC_STATE}",
+            "text": "${VAR_HVAC_STATE}",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "description": "",
+        "hide": 2,
+        "label": "The friendly name for your entity holding outside temperature data in numeric format.",
+        "name": "Outside_Temp",
+        "query": "${VAR_OUTSIDE_TEMP}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_OUTSIDE_TEMP}",
+          "text": "${VAR_OUTSIDE_TEMP}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_OUTSIDE_TEMP}",
+            "text": "${VAR_OUTSIDE_TEMP}",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "description": "",
+        "hide": 2,
+        "label": "The name of the bucket in InfluxDB holding your Home Assistant data.",
+        "name": "HA_Bucket",
+        "query": "${VAR_HA_BUCKET}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_HA_BUCKET}",
+          "text": "${VAR_HA_BUCKET}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_HA_BUCKET}",
+            "text": "${VAR_HA_BUCKET}",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "description": "",
+        "hide": 2,
+        "label": "The friendly name for an entity holding temperature data in numeric format.",
+        "name": "Temp_Sensor_1",
+        "query": "${VAR_TEMP_SENSOR_1}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_TEMP_SENSOR_1}",
+          "text": "${VAR_TEMP_SENSOR_1}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_TEMP_SENSOR_1}",
+            "text": "${VAR_TEMP_SENSOR_1}",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "description": "",
+        "hide": 2,
+        "label": "The friendly name for an entity holding temperature data in numeric format.",
+        "name": "Temp_Sensor_2",
+        "query": "${VAR_TEMP_SENSOR_2}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_TEMP_SENSOR_2}",
+          "text": "${VAR_TEMP_SENSOR_2}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_TEMP_SENSOR_2}",
+            "text": "${VAR_TEMP_SENSOR_2}",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "description": "",
+        "hide": 2,
+        "label": "The friendly name for an entity holding temperature data in numeric format.",
+        "name": "Temp_Sensor_3",
+        "query": "${VAR_TEMP_SENSOR_3}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_TEMP_SENSOR_3}",
+          "text": "${VAR_TEMP_SENSOR_3}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_TEMP_SENSOR_3}",
+            "text": "${VAR_TEMP_SENSOR_3}",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "description": "",
+        "hide": 2,
+        "label": "The friendly name for an entity holding temperature data in numeric format.",
+        "name": "Temp_Sensor_4",
+        "query": "${VAR_TEMP_SENSOR_4}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_TEMP_SENSOR_4}",
+          "text": "${VAR_TEMP_SENSOR_4}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_TEMP_SENSOR_4}",
+            "text": "${VAR_TEMP_SENSOR_4}",
+            "selected": false
+          }
+        ]
       }
     ]
   },
   "time": {
-    "from": "now-7d",
+    "from": "now-90d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "HVAC",
   "uid": "a5781c01-d474-4a30-9df4-d4ba2bfb484b",
-  "version": 24,
+  "version": 30,
   "weekStart": ""
 }
