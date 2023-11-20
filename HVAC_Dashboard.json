@@ -1,15 +1,80 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_INFLUXDB",
+      "label": "InfluxDB",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "influxdb",
+      "pluginName": "InfluxDB"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "panel",
+      "id": "barchart",
+      "name": "Bar chart",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.2.0"
+    },
+    {
+      "type": "datasource",
+      "id": "influxdb",
+      "name": "InfluxDB",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "state-timeline",
+      "name": "State timeline",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "xychart",
+      "name": "XY Chart",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 1,
+  "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
     {
       "datasource": {
         "type": "influxdb",
-
+        "uid": "${DS_INFLUXDB}"
       },
       "description": "",
       "fieldConfig": {
@@ -151,7 +216,7 @@
         {
           "datasource": {
             "type": "influxdb",
-
+            "uid": "${DS_INFLUXDB}"
           },
           "query": "import \"contrib/tomhollingworth/events\"\r\nimport \"math\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nhvac_state_day_ends = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: \"_value\")\r\n\r\nhvac_states = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n\r\nhvac_states_daily = union(tables: [hvac_state_day_ends, hvac_states])\r\n  |> group()\r\n  |> sort(columns: [\"_time\"])\r\n  |> events.duration(unit: 1s, columnName: \"elapsed\")\r\n  |> group(columns: [\"_value\"], mode:\"by\")\r\n  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: \"elapsed\")\r\n  |> fill(column: \"elapsed\", value: 0)\r\n  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))\r\n  |> filter(fn: (r) => r[\"_value\"] != \"idle\")\r\n  |> filter(fn: (r) => r[\"elapsed_pct\"] != 0)\r\n  |> rename(columns: {_value: \"state\"})\r\n  |> keep(columns: [\"_time\", \"elapsed_pct\", \"state\"])\r\n\r\n//yield(tables: hvac_states_daily, name: \"hvac_states_daily\")\r\n\r\noutside_temps = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"friendly_name\"])\r\n  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)\r\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"friendly_name\"], valueColumn: \"_value\")\r\n\r\njoin(tables: {hvac_states_daily, outside_temps}, on: [\"_time\"])",
           "refId": "A"
@@ -194,7 +259,7 @@
     {
       "datasource": {
         "type": "influxdb",
-
+        "uid": "${DS_INFLUXDB}"
       },
       "description": "",
       "fieldConfig": {
@@ -337,7 +402,7 @@
         {
           "datasource": {
             "type": "influxdb",
-
+            "uid": "${DS_INFLUXDB}"
           },
           "query": "import \"contrib/tomhollingworth/events\"\r\nimport \"math\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nhvac_state_day_ends = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: \"_value\")\r\n\r\nhvac_states = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n\r\nhvac_states_daily = union(tables: [hvac_state_day_ends, hvac_states])\r\n  |> group()\r\n  |> sort(columns: [\"_time\"])\r\n  |> events.duration(unit: 1s, columnName: \"elapsed\")\r\n  |> group(columns: [\"_value\"], mode:\"by\")\r\n  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: \"elapsed\")\r\n  |> fill(column: \"elapsed\", value: 0)\r\n  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))\r\n  |> filter(fn: (r) => r[\"_value\"] != \"idle\")\r\n  |> rename(columns: {_value: \"state\"})\r\n  |> keep(columns: [\"_time\", \"elapsed_pct\", \"state\"])\r\n\r\noutside_temps = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"_value\", \"friendly_name\"])\r\n  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)\r\n  |> map(fn: (r) => ({r with _value: math.round(x: r._value)}))\r\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"friendly_name\"], valueColumn: \"_value\")\r\n\r\n//yield(tables: outside_temps, name: \"outside_temps\")\r\n\r\njoin(tables: {hvac_states_daily, outside_temps}, on: [\"_time\"])\r\n  |> drop(columns: [\"_time\"])",
           "refId": "A"
@@ -441,7 +506,7 @@
     {
       "datasource": {
         "type": "influxdb",
-
+        "uid": "${DS_INFLUXDB}"
       },
       "fieldConfig": {
         "defaults": {
@@ -564,7 +629,7 @@
         {
           "datasource": {
             "type": "influxdb",
-
+            "uid": "${DS_INFLUXDB}"
           },
           "query": "import \"contrib/tomhollingworth/events\"\r\nimport \"math\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nhvac_state_day_ends = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> aggregateWindow(every: 24h, fn: last, createEmpty: false, column: \"_value\")\r\n\r\nhvac_states = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n\r\nunion(tables: [hvac_state_day_ends, hvac_states])\r\n  |> group()\r\n  |> sort(columns: [\"_time\"])\r\n  |> events.duration(unit: 1s, columnName: \"elapsed\")\r\n  |> group(columns: [\"_value\"], mode:\"by\")\r\n  |> aggregateWindow(every: 24h, fn: sum, createEmpty: true, column: \"elapsed\")\r\n  |> fill(column: \"elapsed\", value: 0)\r\n  |> map(fn: (r) => ({r with elapsed_pct: math.round(x: (float(v: r.elapsed) / 86400.0) * 100.0) }))\r\n  |> filter(fn: (r) => r[\"_value\"] != \"idle\")\r\n  |> drop(columns: [\"elapsed\"])\r\n",
           "refId": "A"
@@ -599,7 +664,7 @@
     {
       "datasource": {
         "type": "influxdb",
-
+        "uid": "${DS_INFLUXDB}"
       },
       "fieldConfig": {
         "defaults": {
@@ -753,7 +818,7 @@
         {
           "datasource": {
             "type": "influxdb",
-
+            "uid": "${DS_INFLUXDB}"
           },
           "query": "import \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\ntemps = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> keep(columns: [\"_time\", \"friendly_name\", \"_value\"])\r\n\r\nmax_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: max, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"max\" }))\r\n  |> yield(name: \"max\")\r\n\r\navg_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: mean, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"avg\" }))\r\n  |> yield(name: \"avg\")\r\n\r\nmin_temp = temps\r\n  |> aggregateWindow(every: 24h, fn: min, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with friendly_name: \"min\" }))\r\n  |> yield(name: \"min\")",
           "refId": "A"
@@ -766,7 +831,7 @@
     {
       "datasource": {
         "type": "influxdb",
-
+        "uid": "${DS_INFLUXDB}"
       },
       "fieldConfig": {
         "defaults": {
@@ -789,7 +854,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "stepAfter",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -922,9 +987,9 @@
         {
           "datasource": {
             "type": "influxdb",
-
+            "uid": "${DS_INFLUXDB}"
           },
-          "query": "import \"interpolate\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nfrom(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Attic Temperature\" or r[\"friendly_name\"] == \"Basement Temperature\" or r[\"friendly_name\"] == \"Bedroom Temperature\" or r[\"friendly_name\"] == \"Kitchen Temperature\" or r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> interpolate.linear(every: 1h)\r\n  |> keep(columns: [\"_time\", \"friendly_name\", \"_value\"])\r\n  |> aggregateWindow(every: v.windowPeriod, fn: first, createEmpty: false)",
+          "query": "import \"interpolate\"\r\nimport \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nfrom(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Attic Temperature\" or r[\"friendly_name\"] == \"Basement Temperature\" or r[\"friendly_name\"] == \"Bedroom Temperature\" or r[\"friendly_name\"] == \"Kitchen Temperature\" or r[\"friendly_name\"] == \"Outside Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n//  |> interpolate.linear(every: 1h)\r\n  |> keep(columns: [\"_time\", \"friendly_name\", \"_value\"])\r\n  |> aggregateWindow(every: v.windowPeriod, fn: first, createEmpty: false)",
           "refId": "A"
         }
       ],
@@ -933,7 +998,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": {},
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1015,7 +1083,7 @@
         {
           "datasource": {
             "type": "influxdb",
-
+            "uid": "${DS_INFLUXDB}"
           },
           "query": "from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"HVAC State\")\r\n  |> keep(columns: [\"_time\", \"_value\"])",
           "refId": "A"
@@ -1028,7 +1096,7 @@
     {
       "datasource": {
         "type": "influxdb",
-
+        "uid": "${DS_INFLUXDB}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1109,7 +1177,7 @@
         {
           "datasource": {
             "type": "influxdb",
-
+            "uid": "${DS_INFLUXDB}"
           },
           "query": "import \"timezone\"\r\n\r\noption location = timezone.location(name: \"America/New_York\")\r\n\r\nbedroom_temp = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Bedroom Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\r\n  |> fill(usePrevious: true)\r\n  |> filter(fn: (r) => exists r._value)\r\n\r\nkitchen_temp = from(bucket: \"home-assistant\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"friendly_name\"] == \"Kitchen Temperature\")\r\n  |> filter(fn: (r) => r[\"_field\"] == \"value\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: true)\r\n  |> fill(usePrevious: true)\r\n  |> filter(fn: (r) => exists r._value)\r\n\r\njoin(tables: {bedroom_temp, kitchen_temp}, on: [\"_time\"])\r\n  |> map(fn: (r) => ({r with diff: float(v: r._value_bedroom_temp - r._value_kitchen_temp)}))\r\n  |> keep(columns: [\"_time\", \"diff\"])",
           "refId": "A"
@@ -1124,15 +1192,34 @@
   "schemaVersion": 38,
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "InfluxDB",
+          "value": "f9459216-b5d9-4cfe-9932-8aeb2a14cd88"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "name": "HA_InfluxDB",
+        "options": [],
+        "query": "influxdb",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
   },
   "time": {
-    "from": "now-6M",
+    "from": "now-7d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "HVAC",
-  "version": 22,
+  "uid": "a5781c01-d474-4a30-9df4-d4ba2bfb484b",
+  "version": 24,
   "weekStart": ""
 }
